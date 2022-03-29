@@ -4,10 +4,11 @@ import numpy as np
 from tensorflow.keras.layers import *
 from layers import *
 from utils import *
-import coremltools
+import coremltools as ct
 import tfcoreml
 from PIL import Image
 import matplotlib.pyplot as plt
+import os
 print(tf.__version__) 
 
 tflite_path = "./tflite_models/face_mesh.tflite"
@@ -67,35 +68,39 @@ facemesh_tf.save("./keras_models/facemesh_tf.h5")
 
 tf.keras.backend.clear_session()
 coreml_tf = tf.keras.models.load_model("./keras_models/facemesh_tf.h5")
-inp_node = coreml_tf.inputs[0].name[:-2].split('/')[-1]
-out_node = coreml_tf.outputs[0].name[:-2].split('/')[-1]
-print(inp_node, out_node)
-facemesh_coreml = tfcoreml.convert(
-    "./keras_models/facemesh_tf.h5",
-    output_feature_names = [out_node],
-    input_name_shape_dict = {inp_node: [1, *list(coreml_tf.inputs[0].shape[1:])]},
-    image_input_names = [inp_node],
-    image_scale = 1/127.5,
-    red_bias = -1,
-    green_bias = -1,
-    blue_bias=-1,
-    minimum_ios_deployment_target='13'
+
+facemesh_coreml_model_path = "./coreml_models/facemesh.mlmodel"
+if os.path.exists(facemesh_coreml_model_path):
+    os.remove(facemesh_coreml_model_path)
+
+image_input = ct.ImageType(
+    name='input_image',
+    bias=[-1,-1,-1],
+    scale=1/127.5,
+    shape=[1, *list(coreml_tf.inputs[0].shape[1:])]
 )
+
+facemesh_coreml = ct.convert(
+    "./keras_models/facemesh_tf.h5",
+    inputs=[image_input],
+)
+
 facemesh_coreml._spec.description.output[0].type.multiArrayType.shape.extend([1, 1405])
 facemesh_coreml._spec.description.output[0].name = "points_confidence"
 facemesh_coreml._spec.neuralNetwork.layers[-1].name = "points_confidence"
 facemesh_coreml._spec.neuralNetwork.layers[-1].output[0] = "points_confidence" #giving appropriate name for output nodes
-facemesh_coreml.save("./coreml_models/facemesh.mlmodel") #currently this coreml model doesnt run on GPU due to coreml bug
+
+facemesh_coreml.save(facemesh_coreml_model_path)
 
 inp_image = Image.open("sample.jpg")
 inp_image = inp_image.resize((192,192))
 inp_image_np = np.array(inp_image).astype(np.float32)
 inp_image_np = np.expand_dims((inp_image_np/127.5) - 1, 0)
-facemesh_coreml = coremltools.models.MLModel("./coreml_models/facemesh.mlmodel")
+facemesh_coreml = ct.models.MLModel(facemesh_coreml_model_path)
 
 print("Checking model sanity across tensorflow, tflite and coreml")
 tf_output = coreml_tf.predict(inp_image_np)
-coreml_output = facemesh_coreml.predict({"input_image": inp_image}, useCPUOnly=True)["points_confidence"]
+coreml_output = facemesh_coreml.predict({"input_image": inp_image})["points_confidence"]
 interpreter.set_tensor(0, inp_image_np)
 interpreter.invoke()
 
