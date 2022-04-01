@@ -25,7 +25,12 @@ exception_mapping = {
     "depthwise_conv2d_18/bias": "depthwise_conv2d_22/Bias",
     "conv2d_21/kernel" : "conv2d_27/Kernel",
     "conv2d_21/bias": "conv2d_27/Bias",
-    "p_re_lu_20/alpha": "p_re_lu_25/Alpha"
+    "p_re_lu_20/alpha": "p_re_lu_25/Alpha",
+    "depthwise_conv2d/depthwise_kernel" : "depthwise_conv2d_0/Kernel",
+    "depthwise_conv2d/bias": "depthwise_conv2d_0/Bias",
+    "conv2d/kernel" : "conv2d_0/Kernel",
+    "conv2d/bias": "conv2d_0/Bias",
+    "p_re_lu/alpha": "p_re_lu_0/Alpha"
 }
 
 def restore_variables(model,tf_lite_mapping, data_format):

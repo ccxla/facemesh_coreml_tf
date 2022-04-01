@@ -9,7 +9,8 @@ import tfcoreml
 from PIL import Image
 import matplotlib.pyplot as plt
 import os
-print(tf.__version__) 
+import re
+print(tf.__version__)
 
 tflite_path = "./tflite_models/face_mesh.tflite"
 interpreter = tf.lite.Interpreter(model_path=tflite_path)
@@ -17,8 +18,9 @@ interpreter.allocate_tensors()
 tf_lite_mapping = {}
 for i in interpreter.get_tensor_details():
     if ("ker" in i["name"].lower()) or ("bia" in i["name"].lower()) or ("alph" in i["name"].lower()):
-        tf_lite_mapping[i['name']] = interpreter.get_tensor(i["index"])
-        
+        # node name indices in https://github.com/google/mediapipe/blob/33d683c67100ef3db37d9752fcf65d30bea440c4/mediapipe/modules/face_landmark/face_landmark.tflite
+        # start at 1, so we need to decrement it in order to map to the correct variables
+        tf_lite_mapping[re.sub('(\d+)(?!.*\d)', lambda x: str(int(x.group(0)) - 1), i['name'])] = interpreter.get_tensor(i["index"])
 
 def create_facenet(input_shape, batch_size = 1, output_dim=1404, data_format="channels_last"):
     if data_format == "channels_first":
